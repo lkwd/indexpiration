@@ -86,6 +86,11 @@ function F:stop_worker()
 	self._wait:put(true,0)
 end
 
+function F:wake_worker()
+	if not self.running then return end
+	self._wait:put(true,0)
+end
+
 function F:start_worker()
 	if self._terminate or self.running then return end
 	self.running = true
