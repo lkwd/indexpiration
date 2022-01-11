@@ -1,7 +1,7 @@
 package = 'indexpiration'
 version = 'scm-1'
 source  = {
-    url    = 'git+ssh://github.com/lkwd/indexpiration.git',
+    url    = 'git+ssh://git@github.com/lkwd/indexpiration.git',
     branch = 'master',
 }
 description = {
