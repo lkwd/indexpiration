@@ -135,8 +135,9 @@ function F:start_worker()
 								break
 							end
 							t = box.space[space.name]:get(expiration._pk(t))
-							if expiration.check( t ) > 0 then
-								t = nil
+							if t then
+								local exp_t = expiration.check( t )
+								if exp_t and exp_t > 0 then t = nil end
 							end
 						end
 						if t then
