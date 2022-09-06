@@ -94,15 +94,24 @@ end
 function F:start_worker()
 	if self._terminate or self.running then return end
 	self.running = true
-	self._worker = fiber.create(function(space,expiration,expire_index)
+	self._worker = fiber.create(function(space,expiration,expire_index,in_maintenance)
 		local fname = space.name .. '.xpr'
 		if package.reload then fname = fname .. '.' .. package.reload.count end
 		fiber.name(string.sub(fname,1,32))
 		repeat fiber.sleep(0.001) until space.expiration
-		log.info("Worker started")
+		log.info("indexpiration: worker started")
 		local curwait
 		local collect = {}
 		while box.space[space.name] and space.expiration == expiration and expiration.running do
+			
+			if in_maintenance and in_maintenance() then
+				log.info("indexpiration: " .. space.name .. " paused (maintenance mode)")
+				while in_maintenance and in_maintenance() do
+					fiber.sleep(1) 
+				end
+				log.info("indexpiration: " .. space.name ..  " resuming (maintenance mode)")
+			end
+
 			local r,e = pcall(function()
 				-- print("runat loop 2 ",box.time64())
 				local remaining
@@ -170,23 +179,23 @@ function F:start_worker()
 				curwait = e
 			else
 				curwait = 1
-				log.error("Worker/ERR: %s",e)
+				log.error("indexpiration: Worker/ERR: %s",e)
 			end
 			-- log.info("Wait %0.2fs",curwait)
 			if curwait == 0 then fiber.sleep(0) end
 			expiration._wait:get(curwait)
 		end
 		if expiration.running then
-			log.info("Worker finished")
+			log.info("indexpiration: Worker finished")
 		else
-			log.info("Worker stopped")
+			log.info("indexpiration: Worker stopped")
 		end
-	end,box.space[self.space],self,self.expire_index)
+	end,box.space[self.space],self,self.expire_index, self.in_maintenance)
 end
 
 function M.upgrade(space,opts,depth)
 	depth = depth or 0
-	log.info("Indexpiration upgrade(%s,%s)", space.name, json.encode(opts))
+	log.info("indexpiration: upgrade(%s,%s)", space.name, json.encode(opts))
 	if not opts.field then error("opts.field required",2) end
 	
 	local self = setmetatable({},{ __index = F })
@@ -205,6 +214,7 @@ function M.upgrade(space,opts,depth)
 	self.on_delete = opts.on_delete
 	self.precise = not not self.precise
 	self.batch_size = opts.batch_size or 300
+	self.in_maintenance = opts.in_maintenance
 		
 	local format_av = box.space._space.index.name:get(space.name)[ 7 ]
 	local format = {}
@@ -307,7 +317,7 @@ function M.upgrade(space,opts,depth)
 		self._wait:put(true,0)
 	end
 
-	log.info("Upgraded %s into indexpiration (status=%s)", space.name, box.info.status)
+	log.info("indexpiration: Upgraded %s into indexpiration (status=%s)", space.name, box.info.status)
 end
 
 setmetatable(M,{
